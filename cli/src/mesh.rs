@@ -84,7 +84,7 @@ fn closes(triangles: &[[u32; 3]]) -> bool {
 /// crossings of a ray. The direction is an odd one, so that a ray along an
 /// axis-aligned edge -- common in modelled parts -- is unlikely.
 fn inside(positions: &[[f64; 3]], triangles: &[[u32; 3]], point: [f64; 3]) -> bool {
-    let d = [0.5772156649015329, 0.6180339887498949, 0.5328630035435834];
+    let d = [0.531_7, 0.611_3, 0.586_9];
     let mut crossings = 0;
     for t in triangles {
         let [a, b, c] = t.map(|i| positions[i as usize]);
