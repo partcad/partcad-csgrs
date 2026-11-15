@@ -22,8 +22,8 @@ board design-readiness checker built on it.
 
 `csgrs:` is the name the workspace imports this package under; use whatever name the dependency is given.
 It needs PartCAD 0.10.0 or newer, the first that reads a plugin package's `qual:` section; the sketch types need a
-PartCAD with `sketchTypes:` ([partcad/partcad#963](https://github.com/partcad/partcad/pull/963), in the first release
-after 0.10.24), and an older one builds everything else and says it does not know a sketch's type.
+PartCAD with `sketchTypes:` -- 0.10.25 or newer ([partcad/partcad#963](https://github.com/partcad/partcad/pull/963))
+-- and an older one builds everything else and says it does not know a sketch's type.
 
 ## Using it
 
