@@ -10,8 +10,9 @@ desc: |
   Parts built with the csgrs plugin: one per part type, from its own keys,
   its declared parameters, or the files beside this one ('logo.png', a ring
   and a bar; 'model.wrl', a 2 x 1 x 0.5 box in tenths of an inch;
-  'bracket.csgrs', a plate with a hub and a hole) -- and a board hyperdrc
-  checks ('board.kicad_pcb').
+  'bracket.csgrs', a plate with a hub and a hole); one sketch per sketch
+  type, and a part extruded from one ('plate.csgrs', a rounded plate with a
+  hole in each corner); and a board hyperdrc checks ('board.kicad_pcb').
 
 dependencies:
   csgrs:
@@ -80,3 +81,29 @@ parts:
         drc:
           path: csgrs:hyperdrc
           desc: The board's design readiness, as hyperdrc checks it
+
+  # A sketch of this package's own, extruded by PartCAD rather than by csgrs.
+  plate:
+    type: extrude
+    sketch: plate_outline
+    depth: 3
+
+sketches:
+  wheel:
+    type: csgrs:gear_profile
+    teeth: 12
+    bore: 4
+  section:
+    type: csgrs:airfoil_profile
+    naca: "2412"
+    chord: 40
+  wordmark:
+    type: csgrs:text_profile
+    text: PC
+  plate_outline:
+    type: csgrs:csg_profile
+    path: plate.csgrs
+    parameters:
+      width:
+        type: float
+        default: 40.0

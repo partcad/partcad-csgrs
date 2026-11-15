@@ -16,10 +16,14 @@ board design-readiness checker built on it.
 | A VRML 2.0 model, such as a KiCad component's | `type: csgrs:vrml` | `<name>.wrl` |
 | A CSG tree written in YAML or JSON | `type: csgrs:csg` | `<name>.csgrs` |
 | Ready-made parametric parts | `csgrs:spur_gear`, `helical_gear`, `cycloidal_gear`, `rack`, `gyroid`, `schwarz_p`, `schwarz_d`, `naca_airfoil`, `text` | — |
+| The same profiles as sketches | `type: csgrs:gear_profile`, `rack_profile`, `airfoil_profile`, `text_profile`, `truetype_profile`, `image_profile`, `csg_profile` | as the part type |
+| Ready-made parametric sketches | `csgrs:gear_outline`, `naca_section`, `text_outline` | — |
 | hyperdrc's PCB design-readiness checks | `qual: other: <name>: {path: csgrs:hyperdrc}` | a `.kicad_pcb`, or Gerbers |
 
 `csgrs:` is the name the workspace imports this package under; use whatever name the dependency is given.
-It needs PartCAD 0.10.0 or newer, the first that reads a plugin package's `qual:` section.
+It needs PartCAD 0.10.0 or newer, the first that reads a plugin package's `qual:` section; the sketch types need a
+PartCAD with `sketchTypes:` ([partcad/partcad#963](https://github.com/partcad/partcad/pull/963)), and an older one
+builds everything else and says it does not know a sketch's type.
 
 ## Using it
 
@@ -89,6 +93,31 @@ Any part may also say `policy:` — how csgrs decides its geometric predicates: 
 failure), `approximate` (csgrs's 512-bit fallback), or the default, `auto`: strict, and approximate only where
 strict cannot decide, with a note in PartCAD's debug log (`pc --verbose`) saying so.
 
+### Sketches
+
+Every part type built from a region of the plane has a sketch type for that region: `gear_profile`,
+`rack_profile`, `airfoil_profile`, `text_profile`, `truetype_profile`, `image_profile` and `csg_profile`, each
+taking its part type's parameters less those only a solid has (`thickness`, `depth`, `span`, `helix_angle`). A
+sketch is the region's faces, each with its holes, and every boundary is the curve csgrs kept -- a line, a
+circular arc, a Bezier curve -- rather than a polygon standing in for it; a TrueType glyph is its own Bezier
+curves. (Where csgrs itself samples a curve -- a gear's involute flanks, a `circle` -- the sketch has those
+samples, as the part does.)
+
+```yaml
+sketches:
+  wheel:
+    type: csgrs:gear_profile
+    teeth: 24
+    bore: 5
+  outline:
+    type: csgrs:csg_profile     # reads outline.csgrs: a tree whose root is a profile
+parts:
+  wheel_plate:
+    type: extrude               # PartCAD's own extrusion, of csgrs's profile
+    sketch: wheel
+    depth: 3
+```
+
 ### CSG trees
 
 A `csg` part reads a tree from its file, `<name>.csgrs`, in YAML (of which JSON is a part). Each node is a mapping
@@ -125,6 +154,8 @@ parts:
 | Either | `union`, `difference`, `intersection`, `xor`: a list of nodes, all solids or all profiles |
 | Solids from solids | `hull: [...]`, `minkowski: [a, b]` |
 | The part types | `gear`, `rack`, `tpms`, `airfoil`, `text`, `truetype` (with `font:`, a file beside the tree) as solids, and `gear_profile`, `rack_profile`, `airfoil_profile`, `text_profile`, `truetype_profile` as profiles, each with that type's parameters |
+
+A `csg_profile` sketch reads the same kind of tree, whose root is a profile rather than a solid.
 
 A string `"${expression}"` anywhere in the tree is replaced by its value over the part's parameters; `${...}`
 inside a longer string (`text: "M${size}"`) by its text. An expression has arithmetic, comparisons, `x if c else

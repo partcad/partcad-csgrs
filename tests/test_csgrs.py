@@ -586,8 +586,37 @@ def test_pc_qual_test_fails_the_board(ctx):
 
 
 # --------------------------------------------------------------------------- #
-# The profiles, which the sketch types are made of                            #
+# The sketch types                                                            #
 # --------------------------------------------------------------------------- #
+
+
+@pytest.fixture
+def sketch():
+    sys.path.insert(0, PLUGIN)
+    try:
+        yield _module("csgrs_sketch")
+    finally:
+        sys.path.remove(PLUGIN)
+
+
+def test_the_package_declares_every_sketch_type_the_program_builds(described):
+    declared = _yaml(os.path.join(PLUGIN, "partcad.yaml"))["sketchTypes"]
+    assert sorted(declared) == sorted(described["sketch_types"])
+    for name, spec in described["sketch_types"].items():
+        assert declared[name]["path"] == "csgrs_sketch.py"
+        assert declared[name].get("extension") == spec["extension"], name
+        for parameter in spec["parameters"]:
+            assert parameter["name"] in declared[name]["desc"], (name, parameter["name"])
+
+
+def test_the_ready_made_sketches_declare_the_types_own_parameters(described):
+    package = _yaml(os.path.join(PLUGIN, "partcad.yaml"))
+    for name, declared in package["sketches"].items():
+        spec = {p["name"]: p for p in described["sketch_types"][declared["type"].lstrip(":")]["parameters"]}
+        for parameter, value in declared["parameters"].items():
+            assert parameter in spec, (name, parameter)
+            assert value["type"] == spec[parameter]["type"], (name, parameter)
+            assert value["default"] == spec[parameter]["default"], (name, parameter)
 
 
 def test_a_profile_keeps_its_holes_and_its_curves(tmp_path):
@@ -602,3 +631,72 @@ def test_a_profile_keeps_its_holes_and_its_curves(tmp_path):
     faces = json.loads(out.read_text())["faces"]
     assert len(faces) == 1 and len(faces[0]["holes"]) == 1
     assert {next(iter(segment)) for segment in faces[0]["holes"][0]} == {"line"}
+
+
+def test_a_font_s_outline_is_its_bezier_curves(sketch, tmp_path):
+    np = pytest.importorskip("numpy")  # noqa: F841 - OCP needs it, and the faces are made with OCP
+    pytest.importorskip("OCP")
+    from OCP.BRepAdaptor import BRepAdaptor_Curve
+    from OCP.BRepCheck import BRepCheck_Analyzer
+    from OCP.GeomAbs import GeomAbs_BezierCurve
+    from OCP.TopAbs import TopAbs_EDGE
+    from OCP.TopExp import TopExp_Explorer
+    from OCP.TopoDS import TopoDS
+
+    profile = {
+        "faces": [
+            {
+                "outer": [
+                    {"line": [[0, 0], [10, 0]]},
+                    {"bezier": [[10, 0], [15, 5], [10, 10]]},
+                    {"arc": {"start": [10, 10], "end": [0, 10], "center": [5, 10], "clockwise": False}},
+                    {"polyline": [[0, 10], [0, 5], [0, 0]]},
+                ],
+                "holes": [[{"line": [[2, 2], [2, 4]]}, {"line": [[2, 4], [4, 4]]}, {"line": [[4, 4], [2, 2]]}]],
+            }
+        ]
+    }
+    faces = sketch.faces_of(profile)
+    assert len(faces) == 1 and BRepCheck_Analyzer(faces[0]).IsValid()
+    explorer, beziers = TopExp_Explorer(faces[0], TopAbs_EDGE), 0
+    while explorer.More():
+        beziers += BRepAdaptor_Curve(TopoDS.Edge_s(explorer.Current())).GetType() == GeomAbs_BezierCurve
+        explorer.Next()
+    assert beziers == 1
+
+
+def test_an_arc_s_middle_follows_its_direction(sketch):
+    arc = {"start": [1, 0], "end": [0, 1], "center": [0, 0], "clockwise": False}
+    assert sketch._arc_middle(arc) == pytest.approx([2**-0.5, 2**-0.5])
+    arc["clockwise"] = True
+    assert sketch._arc_middle(arc) == pytest.approx([-(2**-0.5), -(2**-0.5)])
+
+
+def _sketch_types(ctx):
+    if not hasattr(ctx.get_project("//csgrs"), "get_sketch_type_config"):
+        pytest.skip("this PartCAD has no sketchTypes; it is older than the csgrs sketch types")
+
+
+@pytest.mark.slow
+def test_a_sketch_is_the_size_its_parameters_say(ctx):
+    _sketch_types(ctx)
+    from partcad import shape_envelope
+
+    def bbox(name):
+        sketch_ = ctx.get_sketch(name)
+        envelope = asyncio.run(sketch_.get_wrapped(ctx))
+        assert envelope is not None, sketch_.errors
+        return envelope[shape_envelope.KEY_METADATA][shape_envelope.METADATA_MEASUREMENTS]["bbox"]
+
+    # 12 teeth of module 1: tips on a 14 mm circle.
+    assert bbox(":wheel") == pytest.approx([-7, -7, 0, 7, 7, 0], abs=1e-6)
+    assert bbox(":plate_outline;width=60.0")[3] == pytest.approx(60)
+    assert bbox("//csgrs:gear_outline;teeth=30,module=2.0")[3] == pytest.approx(32)
+
+
+@pytest.mark.slow
+def test_a_sketch_is_extruded_by_partcad(ctx):
+    _sketch_types(ctx)
+    measured = _measured(ctx, ":plate")
+    assert measured["bbox"] == pytest.approx([0, 0, 0, 40, 20, 3], abs=1e-6)
+    assert measured["volume"] == pytest.approx(2208, rel=1e-3)

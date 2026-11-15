@@ -1,0 +1,11 @@
+# A rounded plate with a hole in each corner: a 'csg_profile' sketch's tree.
+difference:
+  - rounded_rectangle: {width: "${width}", height: 20, r: 4}
+  - circle: {r: 2, segments: 32}
+    translate: [4, 4]
+  - circle: {r: 2, segments: 32}
+    translate: ["${width - 4}", 4]
+  - circle: {r: 2, segments: 32}
+    translate: [4, 16]
+  - circle: {r: 2, segments: 32}
+    translate: ["${width - 4}", 16]

@@ -60,7 +60,11 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # Raise with any change to what this produces, which includes moving the
 # release 'csgrs_tool.py' pins (see PartCAD's 'code_version').
-CACHE_VERSION = 1
+CACHE_VERSION = 2
+
+# The types built from a tree in a '.csgrs' file, which may use any parameter
+# the part or sketch declares.
+TREE_TYPES = ("csg", "csg_profile")
 
 # The part types whose surface has no two neighbouring faces in one plane,
 # for which merging coplanar faces is time spent finding none.
@@ -219,7 +223,7 @@ def parameters(name, spec, request):
     names = [p["name"] for p in spec]
     values = {key: config[key] for key in names if key in config and config[key] is not None}
     unknown = sorted(set(declared) - set(names))
-    if unknown and name != "csg":
+    if unknown and name not in TREE_TYPES:
         raise ValueError(
             "a '%s' part has no parameter %s; it has %s"
             % (name, ", ".join("'%s'" % u for u in unknown), ", ".join(names) or "none")
@@ -228,8 +232,8 @@ def parameters(name, spec, request):
     return values
 
 
-def build_request(name, spec, request):
-    """What 'csgrs-partcad build' is asked."""
+def build_request(name, spec, request, tree_type="csg"):
+    """What 'csgrs-partcad build' (or 'profile') is asked; 'tree_type' is the type read from a tree."""
     asked = {"type": name, "parameters": parameters(name, spec, request)}
     config = request.get("config") or {}
     policy = config.get("policy")
@@ -238,9 +242,12 @@ def build_request(name, spec, request):
     if request.get("path"):
         asked["path"] = os.path.abspath(request["path"])
         asked["base"] = os.path.dirname(asked["path"])
-    if name == "csg":
+    if name == tree_type:
         if not request.get("path"):
-            raise ValueError("a 'csg' part reads its tree from a file, and PartCAD handed it none")
+            raise ValueError(
+                "a '%s' %s reads its tree from a file, and PartCAD handed it none"
+                % (name, request.get("kind") or "part")
+            )
         names = dict(request.get("parameters") or {})
         asked["tree"] = substitute(read_tree(request["path"]), names)
     return asked

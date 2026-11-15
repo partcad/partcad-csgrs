@@ -51,7 +51,7 @@ import zipfile
 
 # The release of this repository the programs come from. Moving it is moving
 # both programs; see README.md, "Releasing".
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 RELEASE_URL = "https://github.com/partcad/partcad-csgrs/releases/download/v%s/" % VERSION
 
 # What each program says its version is ('<name> <version> ...' on '--version'),
@@ -66,23 +66,23 @@ PROGRAMS = {
 ASSETS = {
     ("linux", "x86_64"): (
         "csgrs-partcad-%s-x86_64-unknown-linux-gnu.tar.gz" % VERSION,
-        "aee71a5b689cd7183f2cbdb40209db3a22cbe600e0bf69270e880eef6227690c",
+        "138fe23864f45cfc70039cab5810a53f79e3363e1d96fcf4489010537aa58590",
     ),
     ("linux", "aarch64"): (
         "csgrs-partcad-%s-aarch64-unknown-linux-gnu.tar.gz" % VERSION,
-        "e71a8de4bcb5e2c73c74c75badb35f78a53d9498baf2601dc369a7837af79099",
+        "ffbc9a8755e14e78a22c7e29309e55efcc0a6d216777477184e0cf94e74cc183",
     ),
     ("darwin", "x86_64"): (
         "csgrs-partcad-%s-x86_64-apple-darwin.tar.gz" % VERSION,
-        "1c637895d9747ea945c3427f5b828899cefa8bb04ed11425df897623fe7bd11b",
+        "173eaac5c01dc76a29a51bca260ecdc8ae7e94b2ed5034a7aab4f0e3fcf5a282",
     ),
     ("darwin", "aarch64"): (
         "csgrs-partcad-%s-aarch64-apple-darwin.tar.gz" % VERSION,
-        "b15f56fa5eb1119c6b25051dbb8013a8ded3102876f4fdd15a5265b7c7c814b6",
+        "284eaeaa652340fbda25d049082417af0b8ba4be8376690f0c597ef13a845dbe",
     ),
     ("windows", "x86_64"): (
         "csgrs-partcad-%s-x86_64-pc-windows-msvc.zip" % VERSION,
-        "997fd26484570acaac5950a53d49cdffcbb558dd4c94eaa06d01e3bfb6f35112",
+        "e135a143ab344958d351f5a5272181f73fb5022d0624d98569072adfd6934472",
     ),
 }
 

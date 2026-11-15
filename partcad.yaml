@@ -32,7 +32,7 @@ url: https://github.com/partcad/partcad-csgrs
 # image and the code expecting it cannot drift apart silently. PartCAD appends
 # the machine's architecture before pulling, so one line here covers both. See
 # `.github/workflows/image.yml` and `image-tag.sh`.
-dockerImage: ghcr.io/partcad/partcad-csgrs:3e1de447f18d
+dockerImage: ghcr.io/partcad/partcad-csgrs:66f7bac47e3c
 
 # Every part type is the one script, which tells them apart by the name after
 # the last ':' of the part's `type:`. Each builds a closed solid, and says so
@@ -105,6 +105,55 @@ partTypes:
     path: csgrs_part.py
     extension: csgrs
     requireSolid: true
+    pythonRequirements:
+      - pyyaml
+
+# The profiles the part types extrude, as sketches: the region csgrs builds in
+# the XY plane, its boundary the curves csgrs kept -- lines, circular arcs,
+# Bezier curves -- rather than a polygon standing in for them. One script for
+# all of them, as for the part types. Each takes its part type's parameters
+# less those only a solid has (thickness, depth, span).
+sketchTypes:
+  gear_profile:
+    desc: |
+      The tooth profile of an involute or cycloidal gear, with its bore.
+      Parameters: profile, module, teeth, pressure_angle, clearance, backlash,
+      generating_radius, bore, segments_per_flank.
+    path: csgrs_sketch.py
+  rack_profile:
+    desc: |
+      The tooth profile of an involute or cycloidal rack. Parameters:
+      profile, module, teeth, pressure_angle, clearance, backlash,
+      segments_per_flank.
+    path: csgrs_sketch.py
+  airfoil_profile:
+    desc: |
+      A NACA four-digit airfoil section. Parameters: naca, chord, samples.
+    path: csgrs_sketch.py
+  text_profile:
+    desc: |
+      Text in one of the Hershey single-stroke fonts built into csgrs, its
+      strokes given a width. Parameters: text, size, font, stroke, halign.
+    path: csgrs_sketch.py
+  truetype_profile:
+    desc: |
+      Text in a TrueType or OpenType font, as its glyphs' outlines. The
+      sketch's file is the font. Parameters: text, size, halign.
+    path: csgrs_sketch.py
+    extension: ttf
+  image_profile:
+    desc: |
+      A raster image (PNG, JPEG, BMP or GIF) traced at a grey level.
+      Parameters: threshold, invert, pixel_size.
+    path: csgrs_sketch.py
+    extension: png
+  csg_profile:
+    desc: |
+      A profile written as a CSG tree in YAML or JSON: profiles, offsets,
+      booleans and placements, with '${...}' expressions over the sketch's
+      parameters. See README.md.
+    path: csgrs_sketch.py
+    extension: csgrs
     pythonRequirements:
       - pyyaml
 
@@ -450,3 +499,79 @@ parts:
         enum: [left, center, right]
         default: "left"
         desc: "Where X = 0 is: the 'left', 'center' or 'right' of the text."
+# Ready-made sketches, like the ready-made parts: `csgrs:gear_outline;teeth=30`.
+sketches:
+  gear_outline:
+    type: ":gear_profile"
+    desc: "The outline of an involute spur gear, with its bore: to extrude, to cut, to draw."
+    parameters:
+      module:
+        type: float
+        default: 1.0
+        desc: "The module in mm: the pitch diameter divided by the number of teeth."
+      teeth:
+        type: int
+        default: 20
+        desc: "The number of teeth (at least 4 for an involute gear, 3 for a cycloidal one)."
+      pressure_angle:
+        type: float
+        default: 20.0
+        desc: "The pressure angle of an involute gear, in degrees."
+      clearance:
+        type: float
+        default: 0.25
+        desc: "The root clearance, as a multiple of the module."
+      backlash:
+        type: float
+        default: 0.0
+        desc: "The backlash of an involute gear, in mm."
+      bore:
+        type: float
+        default: 0.0
+        desc: "The diameter of a hole through the centre, in mm; 0 for none."
+      segments_per_flank:
+        type: int
+        default: 8
+        desc: "How many straight segments approximate each tooth flank."
+  naca_section:
+    type: ":airfoil_profile"
+    desc: "A NACA four-digit wing section."
+    parameters:
+      naca:
+        type: string
+        default: "2412"
+        desc: "The four-digit NACA designation, such as '0012' or '2412'."
+      chord:
+        type: float
+        default: 100.0
+        desc: "The chord length, in mm."
+      samples:
+        type: int
+        default: 80
+        desc: "How many points each surface of the section is sampled at (at least 10)."
+  text_outline:
+    type: ":text_profile"
+    desc: "Text in a single-stroke Hershey font, as the outline of its strokes: to engrave, to cut, to extrude."
+    parameters:
+      text:
+        type: string
+        default: "PartCAD"
+        desc: "The text. A newline starts a new line."
+      size:
+        type: float
+        default: 10.0
+        desc: "The height of a capital letter, in mm."
+      font:
+        type: string
+        default: "futural"
+        desc: "The built-in single-stroke Hershey font, by name: such as 'futural', 'futuram', 'rowmans', 'rowmand', 'timesr', 'scripts', 'gothiceng' or 'greek'."
+      stroke:
+        type: float
+        default: 0.0
+        desc: "The width of the strokes, in mm; 0 for a tenth of 'size'."
+      halign:
+        type: string
+        enum: [left, center, right]
+        default: "left"
+        desc: "Where X = 0 is: the 'left', 'center' or 'right' of the text."
+
