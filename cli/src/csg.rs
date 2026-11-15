@@ -174,6 +174,15 @@ impl Tree<'_> {
         }
     }
 
+    pub fn profile(&mut self, node: &Value) -> Result<CurveRegion2, Fail> {
+        match self.node(node, "")? {
+            Geom::Profile(region) => Ok(region),
+            Geom::Solid(_) => Err(Fail::input(
+                "the tree is a solid, not a profile; a 'csg_profile' sketch is a profile's tree",
+            )),
+        }
+    }
+
     fn node(&mut self, node: &Value, path: &str) -> Result<Geom, Fail> {
         let Some(map) = node.as_object() else {
             return Err(Fail::input(format!(

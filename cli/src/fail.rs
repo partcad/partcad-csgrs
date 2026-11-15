@@ -50,7 +50,10 @@ impl From<csgrs::Error> for Fail {
 /// carry no kind of their own to ask.
 pub fn other(e: impl fmt::Display) -> Fail {
     let message = e.to_string();
-    if message.to_ascii_lowercase().contains("undecided") {
+    // Hypercurve says a comparison its strict policy could not decide in
+    // either of two ways: "undecided", and "blocked by <the comparison>".
+    let lower = message.to_ascii_lowercase();
+    if lower.contains("undecided") || lower.contains("was blocked by") {
         Fail::Undecided(message)
     } else {
         Fail::Other(message)

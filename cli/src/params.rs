@@ -441,6 +441,66 @@ pub fn find(name: &str) -> Option<PartType> {
     part_types().into_iter().find(|t| t.name == name)
 }
 
+/// The parameters only a solid has: what a profile is extruded or twisted by.
+fn solid_only(part_type: &str) -> &'static [&'static str] {
+    match part_type {
+        "gear" => &["thickness", "helix_angle", "slices"],
+        "rack" => &["thickness"],
+        "airfoil" => &["span"],
+        "text" | "truetype" | "image" => &["depth"],
+        _ => &[],
+    }
+}
+
+/// The part types that have a profile: every one built from a region of the
+/// plane before it is made a solid.
+const PROFILED: &[&str] = &[
+    "gear", "rack", "airfoil", "text", "truetype", "image", "csg",
+];
+
+/// The sketch types: `<part type>_profile`, the region a part type extrudes,
+/// with the part type's parameters less those only a solid has.
+pub fn sketch_types() -> Vec<PartType> {
+    part_types()
+        .into_iter()
+        .filter(|t| PROFILED.contains(&t.name))
+        .map(|t| {
+            let solid = solid_only(t.name);
+            let desc = match t.name {
+                "gear" => "The tooth profile of an involute or cycloidal gear, with its bore.",
+                "rack" => "The tooth profile of an involute or cycloidal rack.",
+                "airfoil" => "A NACA four-digit airfoil section.",
+                "text" => "Text in one of the Hershey single-stroke fonts built into csgrs, its strokes given a width.",
+                "truetype" => "Text in a TrueType or OpenType font -- the sketch's file is the font -- as its glyphs' outlines.",
+                "image" => "A raster image (PNG, JPEG, BMP, GIF) traced at a grey level.",
+                _ => "A profile written as a CSG tree in YAML or JSON: profiles, offsets, booleans and placements.",
+            };
+            PartType {
+                name: profile_name(t.name),
+                desc,
+                extension: t.extension,
+                params: t.params.into_iter().filter(|p| !solid.contains(&p.name)).collect(),
+            }
+        })
+        .collect()
+}
+
+fn profile_name(part_type: &str) -> &'static str {
+    match part_type {
+        "gear" => "gear_profile",
+        "rack" => "rack_profile",
+        "airfoil" => "airfoil_profile",
+        "text" => "text_profile",
+        "truetype" => "truetype_profile",
+        "image" => "image_profile",
+        _ => "csg_profile",
+    }
+}
+
+pub fn find_sketch(name: &str) -> Option<PartType> {
+    sketch_types().into_iter().find(|t| t.name == name)
+}
+
 /// The parameters of one request, checked against one part type's table.
 pub struct Args {
     values: Map<String, Value>,
@@ -580,10 +640,9 @@ fn check(owner: &str, spec: &Param, value: &Value) -> Result<(), Fail> {
     }
 }
 
-/// Everything `describe` prints: the part types and their parameters.
-pub fn describe() -> Value {
-    let mut types = Map::new();
-    for t in part_types() {
+fn described(types: Vec<PartType>) -> Map<String, Value> {
+    let mut described = Map::new();
+    for t in types {
         let params: Vec<Value> = t
             .params
             .iter()
@@ -600,16 +659,22 @@ pub fn describe() -> Value {
                 entry
             })
             .collect();
-        types.insert(
+        described.insert(
             t.name.to_string(),
             json!({"desc": t.desc, "extension": t.extension, "parameters": params}),
         );
     }
+    described
+}
+
+/// Everything `describe` prints: the part and sketch types and their parameters.
+pub fn describe() -> Value {
     json!({
         "name": env!("CARGO_PKG_NAME"),
         "version": env!("CARGO_PKG_VERSION"),
         "csgrs": crate::CSGRS_REV,
-        "types": types,
+        "types": described(part_types()),
+        "sketch_types": described(sketch_types()),
     })
 }
 

@@ -176,9 +176,22 @@ def test_every_platform_names_an_asset_of_the_pinned_release(tool):
         assert re.fullmatch(r"[0-9a-f]{64}", sha256), (system, machine)
 
 
-def test_the_tool_pins_the_crate_s_version(tool):
+def _crate_version():
     with open(os.path.join(PLUGIN, "cli", "Cargo.toml"), encoding="utf-8") as f:
-        assert re.search(r'^version = "%s"$' % re.escape(tool.VERSION), f.read(), re.M)
+        return re.search(r'^version = "([^"]+)"$', f.read(), re.M).group(1)
+
+
+def _version(text):
+    return tuple(int(part) for part in text.split("."))
+
+
+def test_the_tool_pins_a_release_of_the_crate(tool):
+    """The scripts run a release: the crate's own version, or one before it while that one is being released.
+
+    A new version of the program is released from main before the scripts move
+    to it (see README.md, "Releasing"), so for one commit the crate is ahead.
+    """
+    assert _version(tool.VERSION) <= _version(_crate_version())
     assert tool.PROGRAMS["csgrs-partcad"] == tool.VERSION
 
 
@@ -291,15 +304,15 @@ def test_without_a_cache_directory_the_package_s_own_is_used(tool):
 
 
 def _cli():
-    """'csgrs-partcad' as built from 'cli/', or the pinned one on the PATH."""
+    """'csgrs-partcad' as 'cli/' builds it now: built there, or on the PATH at the crate's version."""
     tool = _module("csgrs_tool")
     for candidate in (
         os.path.join(PLUGIN, "cli", "target", "release", "csgrs-partcad"),
         shutil.which("csgrs-partcad"),
     ):
-        if candidate and os.path.isfile(candidate) and tool.version_of(candidate, "csgrs-partcad") == tool.VERSION:
+        if candidate and os.path.isfile(candidate) and tool.version_of(candidate, "csgrs-partcad") == _crate_version():
             return candidate
-    pytest.skip("no csgrs-partcad %s here; build it with `cargo build --release` in cli/" % tool.VERSION)
+    pytest.skip("no csgrs-partcad %s here; build it with `cargo build --release` in cli/" % _crate_version())
 
 
 @pytest.fixture(scope="module")
@@ -569,3 +582,22 @@ def test_pc_qual_test_fails_the_board(ctx):
     log = result.stdout + result.stderr
     assert result.returncode != 0, log
     assert "Qualification failed: //:board: drc: drill-to-copper-clearance" in log
+
+
+# --------------------------------------------------------------------------- #
+# The profiles, which the sketch types are made of                            #
+# --------------------------------------------------------------------------- #
+
+
+def test_a_profile_keeps_its_holes_and_its_curves(tmp_path):
+    tree = {"difference": [{"circle": {"r": 10, "segments": 64}}, {"square": 4, "center": True}]}
+    request = tmp_path / "request.json"
+    request.write_text(json.dumps({"type": "csg_profile", "tree": tree}))
+    out = tmp_path / "profile.json"
+    report = json.loads(
+        subprocess.run([_cli(), "profile", str(request), str(out)], capture_output=True, text=True, check=True).stdout
+    )
+    assert report["faces"] == 1 and report["bbox"] == pytest.approx([-10, -10, 10, 10])
+    faces = json.loads(out.read_text())["faces"]
+    assert len(faces) == 1 and len(faces[0]["holes"]) == 1
+    assert {next(iter(segment)) for segment in faces[0]["holes"][0]} == {"line"}

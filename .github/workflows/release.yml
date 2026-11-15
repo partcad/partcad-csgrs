@@ -2,10 +2,11 @@
 # for every platform PartCAD runs on, in one archive each, with the checksums
 # `csgrs_tool.py` verifies a download against.
 #
-# A release is a version: a push to main whose version (`cli/Cargo.toml`, and
-# `csgrs_tool.py`, which has to agree) has no release yet builds one and
-# publishes it as `v<version>`, tag included. Every other push to main is a
-# check that takes seconds. See README.md, "Releasing".
+# A release is a version: a push to main whose crate version (`cli/Cargo.toml`)
+# has no release yet builds one and publishes it as `v<version>`, tag
+# included. Every other push to main is a check that takes seconds. The
+# scripts move to a release (`csgrs_tool.py`) once it is out, in a commit of
+# their own. See README.md, "Releasing".
 name: Release
 
 on:
@@ -33,16 +34,11 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: The version the package says
+      - name: The version the crate says
         id: version
         run: |
           set -eu
           CRATE="$(grep -m1 '^version = ' cli/Cargo.toml | cut -d'"' -f2)"
-          TOOL="$(grep -m1 '^VERSION = ' csgrs_tool.py | cut -d'"' -f2)"
-          if [ "${CRATE}" != "${TOOL}" ]; then
-            echo "cli/Cargo.toml says ${CRATE} and csgrs_tool.py ${TOOL}; they have to agree." >&2
-            exit 1
-          fi
           echo "VERSION=${CRATE}" >> "${GITHUB_OUTPUT}"
 
       - name: Whether it has a release

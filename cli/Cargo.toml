@@ -1,6 +1,6 @@
 [package]
 name = "csgrs-partcad"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.95"
 description = "The command line tool PartCAD's csgrs plugin runs: a JSON request in, a triangle mesh out"
