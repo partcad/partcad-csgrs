@@ -116,5 +116,7 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - run: python -m pip install pytest pyyaml "${PARTCAD}"
+      # numpy as well: the tests read meshes here that the scripts read in
+      # PartCAD's sandbox, which has it; PartCAD itself does not need it.
+      - run: python -m pip install pytest pyyaml numpy "${PARTCAD}"
       - run: python -m pytest -rs

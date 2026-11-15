@@ -354,6 +354,7 @@ def test_the_program_refuses_a_misspelt_parameter(tmp_path):
 
 
 def test_the_program_builds_a_gear_s_bodies(part, tmp_path):
+    pytest.importorskip("numpy")  # read_mesh's, as it is in PartCAD's sandbox
     request = tmp_path / "request.json"
     request.write_text(json.dumps({"type": "gear", "parameters": {"teeth": 12, "module": 2, "bore": 4}}))
     mesh = tmp_path / "gear.mesh"
