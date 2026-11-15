@@ -191,6 +191,23 @@ def test_one_csgrs_commit_everywhere():
         assert 'CSGRS_REV: &str = "%s"' % revs.pop() in f.read()
 
 
+def test_the_image_pinned_is_the_one_its_inputs_make():
+    """'dockerImage' names the tag 'image-tag.sh' computes from the Dockerfile and what it installs."""
+    if not shutil.which("sh") or not (shutil.which("sha256sum") or shutil.which("shasum")):
+        pytest.skip("no sh and sha256sum here to compute the tag with")
+    tag = subprocess.run(["sh", os.path.join(PLUGIN, "image-tag.sh")], capture_output=True, text=True, check=True)
+    assert _yaml(os.path.join(PLUGIN, "partcad.yaml"))["dockerImage"] == (
+        "ghcr.io/partcad/partcad-csgrs:" + tag.stdout.strip()
+    )
+
+
+def test_the_image_installs_what_a_download_would():
+    """The image runs this very file to install the programs, rather than pinning a release of its own."""
+    with open(os.path.join(PLUGIN, "Dockerfile"), encoding="utf-8") as f:
+        dockerfile = f.read()
+    assert "RUN python3 /tmp/csgrs_tool.py /usr/local/bin" in dockerfile
+
+
 def test_one_on_the_path_is_used_if_it_is_the_pinned_release(tool, monkeypatch, tmp_path):
     monkeypatch.setattr(tool.shutil, "which", lambda name: "/opt/csgrs/bin/" + name)
     monkeypatch.setattr(tool, "version_of", lambda path, name: tool.PROGRAMS[name])

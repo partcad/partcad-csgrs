@@ -22,6 +22,18 @@ desc: |
   hyperdrc's PCB design-readiness checks as a qualification test.
 url: https://github.com/partcad/partcad-csgrs
 
+# Where these scripts run best: PartCAD's Python sandbox image with both
+# programs on the PATH (see `Dockerfile`). A preference, not a requirement -- a
+# machine that cannot pull it runs them in PartCAD's own sandbox, and the
+# scripts fetch the programs themselves.
+#
+# The tag is a hash of what the image is built from rather than a version. It
+# is immutable, so this pin keeps working when the image is next edited, and an
+# image and the code expecting it cannot drift apart silently. PartCAD appends
+# the machine's architecture before pulling, so one line here covers both. See
+# `.github/workflows/image.yml` and `image-tag.sh`.
+dockerImage: ghcr.io/partcad/partcad-csgrs:3e1de447f18d
+
 # Every part type is the one script, which tells them apart by the name after
 # the last ':' of the part's `type:`. Each builds a closed solid, and says so
 # with `requireSolid`, so that a mesh csgrs failed to close is a failure rather

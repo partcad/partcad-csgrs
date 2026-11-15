@@ -63,7 +63,28 @@ PROGRAMS = {
 
 # (operating system, machine) -> (asset, SHA-256), from the release's
 # 'SHA256SUMS.txt'. A platform missing here has no build to download.
-ASSETS = {}
+ASSETS = {
+    ("linux", "x86_64"): (
+        "csgrs-partcad-%s-x86_64-unknown-linux-gnu.tar.gz" % VERSION,
+        "aee71a5b689cd7183f2cbdb40209db3a22cbe600e0bf69270e880eef6227690c",
+    ),
+    ("linux", "aarch64"): (
+        "csgrs-partcad-%s-aarch64-unknown-linux-gnu.tar.gz" % VERSION,
+        "e71a8de4bcb5e2c73c74c75badb35f78a53d9498baf2601dc369a7837af79099",
+    ),
+    ("darwin", "x86_64"): (
+        "csgrs-partcad-%s-x86_64-apple-darwin.tar.gz" % VERSION,
+        "1c637895d9747ea945c3427f5b828899cefa8bb04ed11425df897623fe7bd11b",
+    ),
+    ("darwin", "aarch64"): (
+        "csgrs-partcad-%s-aarch64-apple-darwin.tar.gz" % VERSION,
+        "b15f56fa5eb1119c6b25051dbb8013a8ded3102876f4fdd15a5265b7c7c814b6",
+    ),
+    ("windows", "x86_64"): (
+        "csgrs-partcad-%s-x86_64-pc-windows-msvc.zip" % VERSION,
+        "997fd26484570acaac5950a53d49cdffcbb558dd4c94eaa06d01e3bfb6f35112",
+    ),
+}
 
 MACHINES = {"amd64": "x86_64", "x86_64": "x86_64", "arm64": "aarch64", "aarch64": "aarch64"}
 

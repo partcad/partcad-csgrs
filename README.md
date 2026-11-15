@@ -189,6 +189,19 @@ cargo build --release --locked --manifest-path cli/Cargo.toml
 cargo install hyperdrc --locked --git https://github.com/timschmidt/csgrs --rev "$(grep -m1 -o 'rev = "[0-9a-f]*"' cli/Cargo.toml | cut -d'"' -f2)"
 ```
 
+## The image
+
+[`Dockerfile`](Dockerfile) builds `ghcr.io/partcad/partcad-csgrs` `FROM` PartCAD's Python sandbox image, adding
+the two programs -- installed by `csgrs_tool.py` itself, so the image and a download are the same build -- and
+[`verify_image.py`](verify_image.py) refuses, at build time, an image whose programs cannot build a hollow cube.
+[`.github/workflows/image.yml`](.github/workflows/image.yml) builds it for `amd64` and `arm64` on every pull
+request and publishes it from `main`, tagged with a hash of what it is built from ([`image-tag.sh`](image-tag.sh)):
+`csgrs_tool.py` is one of those inputs, so a new release is a new tag. `partcad.yaml` pins that tag as the
+package's `dockerImage`, which PartCAD's `docker` sandbox uses where it can pull it.
+
+After changing the `Dockerfile`, `verify_image.py` or `csgrs_tool.py`, run `./image-tag.sh` and put what it prints
+into `partcad.yaml` in the same commit; the workflow refuses a pin that does not match.
+
 ## Tests
 
 [`tests/`](tests) is a PartCAD package of its own: a workspace that imports this plugin through a `local`
