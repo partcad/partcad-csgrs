@@ -208,9 +208,10 @@ The tests that need `csgrs-partcad`, `hyperdrc` or PartCAD skip themselves witho
 
 1. Raise `version` in `cli/Cargo.toml` and `VERSION` in `csgrs_tool.py` together (a test holds them to each other),
    and raise `CACHE_VERSION` in `csgrs_part.py` if what a part becomes changes.
-2. Tag the commit `v<version>` and push the tag: the release workflow builds every platform and publishes the
-   archives with their `SHA256SUMS.txt`.
-3. Put each archive's checksum into `ASSETS` in `csgrs_tool.py`.
+2. Merge it to `main`. The release workflow sees a version with no release, builds every platform, and publishes
+   `v<version>` -- tag, archives and their `SHA256SUMS.txt`.
+3. Put each archive's checksum into `ASSETS` in `csgrs_tool.py`, and the image's tag into `partcad.yaml` (see
+   "The image").
 
 ### Updating csgrs
 
