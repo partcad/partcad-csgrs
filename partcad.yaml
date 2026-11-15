@@ -1,0 +1,440 @@
+# csgrs for PartCAD: parts built by csgrs (https://github.com/timschmidt/csgrs),
+# the exact-arithmetic constructive solid geometry kernel written in Rust, and
+# its PCB design-readiness checker, hyperdrc, as a qualification test.
+#
+# Everything here runs one of two native programs, built from csgrs at the
+# commit `cli/Cargo.toml` pins and published as this repository's releases:
+# `csgrs-partcad` for the part types, `hyperdrc` for the test. They are found
+# on the PATH (this package's image carries them), or downloaded on first use --
+# the release pinned in `csgrs_tool.py`, checked against its SHA-256 -- into
+# this package's cache directory, and kept there. There are no Python bindings
+# to install: a request goes in as JSON, a mesh comes back.
+#
+# Needs a PartCAD whose partTypes hand a script its cache directory and file
+# (0.8.228) and that reads a package's `qual:` section (0.10.0).
+partcad: ">=0.10.0"
+
+name: //pub/feature/cad/csgrs
+desc: |
+  csgrs for PartCAD: gears, racks, triply periodic minimal surface lattices,
+  NACA airfoils, single-stroke and TrueType text, traced images, VRML models
+  and CSG trees written in YAML, built by csgrs's exact-arithmetic kernel; and
+  hyperdrc's PCB design-readiness checks as a qualification test.
+url: https://github.com/partcad/partcad-csgrs
+
+# Every part type is the one script, which tells them apart by the name after
+# the last ':' of the part's `type:`. Each builds a closed solid, and says so
+# with `requireSolid`, so that a mesh csgrs failed to close is a failure rather
+# than a part that is quietly wrong for every boolean and every mass -- except
+# `vrml`, whose files (a KiCad component's model, say) are made to be looked
+# at and are often open.
+partTypes:
+  gear:
+    desc: |
+      An involute (spur or helical) or cycloidal gear, extruded from csgrs's
+      tooth profile. Parameters: profile, module, teeth, pressure_angle,
+      clearance, backlash, generating_radius, thickness, helix_angle, slices,
+      bore, segments_per_flank.
+    path: csgrs_part.py
+    requireSolid: true
+  rack:
+    desc: |
+      An involute or cycloidal gear rack. Parameters: profile, module, teeth,
+      pressure_angle, clearance, backlash, thickness, segments_per_flank.
+    path: csgrs_part.py
+    requireSolid: true
+  tpms:
+    desc: |
+      A block of triply periodic minimal surface lattice: gyroid, Schwarz P or
+      Schwarz D, with walls of a given thickness. Parameters: surface, size_x,
+      size_y, size_z, period, thickness, iso, resolution.
+    path: csgrs_part.py
+    requireSolid: true
+  airfoil:
+    desc: |
+      A NACA four-digit airfoil section, extruded along its span. Parameters:
+      naca, chord, span, samples.
+    path: csgrs_part.py
+    requireSolid: true
+  text:
+    desc: |
+      Text in one of the 33 Hershey single-stroke fonts built into csgrs, its
+      strokes given a width and extruded. Parameters: text, size, depth, font,
+      stroke, halign.
+    path: csgrs_part.py
+    requireSolid: true
+  truetype:
+    desc: |
+      Text in a TrueType or OpenType font, extruded from the glyphs' outlines.
+      The part's file is the font. Parameters: text, size, depth, halign.
+    path: csgrs_part.py
+    extension: ttf
+    requireSolid: true
+  image:
+    desc: |
+      A raster image (PNG, JPEG, BMP or GIF) traced at a grey level and
+      extruded: a logo, a stencil. Parameters: threshold, invert, pixel_size,
+      depth.
+    path: csgrs_part.py
+    extension: png
+    requireSolid: true
+  vrml:
+    desc: |
+      The polygon meshes of a VRML 2.0 scene, such as a KiCad component's 3D
+      model. Parameters: units (what one unit of the file is in mm; KiCad's
+      models are in tenths of an inch: 2.54).
+    path: csgrs_part.py
+    extension: wrl
+  csg:
+    desc: |
+      A constructive solid geometry tree written in YAML or JSON: primitives,
+      profiles, extrusions, booleans and transforms, with '${...}' expressions
+      over the part's parameters. See README.md.
+    path: csgrs_part.py
+    extension: csgrs
+    requireSolid: true
+    pythonRequirements:
+      - pyyaml
+
+# hyperdrc's design-readiness checks of a printed circuit board, as a test an
+# object declares under `qual: other:` and `pc qual test --other` runs:
+#
+#     parts:
+#       board:
+#         type: kicad
+#         qual:
+#           other:
+#             drc:
+#               path: //pub/feature/cad/csgrs:hyperdrc
+#
+# See `hyperdrc_qual.py` for what it reads and what it answers.
+qual:
+  hyperdrc:
+    desc: >-
+      hyperdrc's design-readiness checks of a printed circuit board -- copper
+      clearance and width, annular rings, drills, solder mask and paste,
+      silkscreen, outline, mounting holes, fiducials, impedance, return paths,
+      high-current and high-voltage spacing -- from its KiCad board or a
+      package of Gerbers. Fails on an error; on a warning too, if strict.
+    path: hyperdrc_qual.py
+    subtype: other
+    kinds: [part]
+    # A board, a package of Gerbers and a rule file are all read from beside
+    # the object, and PartCAD hashes none of them on the test's behalf: every
+    # run asks hyperdrc again.
+    cache: false
+    timeout: 600
+    # Parameters, which an object may override beside 'path:'.
+    #
+    # The board, relative to the object's package; '' for '<name>.kicad_pcb'.
+    pcb: ""
+    # A directory or an archive of Gerber and drill files to check as well.
+    gerbers: ""
+    # A hyperdrc rule configuration (JSON), relative to the object's package.
+    config: ""
+    # Checks to leave out, separated by commas.
+    ignore: ""
+    # Whether a warning fails the test as an error does.
+    strict: false
+
+# Ready-made parts, so that a gear is `csgrs:spur_gear;teeth=30,module=2` with
+# nothing declared. Each parameter's type and default are the part type's own,
+# as `csgrs-partcad describe` says them; a test holds the two together.
+parts:
+  spur_gear:
+    type: ":gear"
+    desc: "An involute spur gear."
+    parameters:
+      module:
+        type: float
+        default: 1.0
+        desc: "The module in mm: the pitch diameter divided by the number of teeth."
+      teeth:
+        type: int
+        default: 20
+        desc: "The number of teeth (at least 4 for an involute gear, 3 for a cycloidal one)."
+      pressure_angle:
+        type: float
+        default: 20.0
+        desc: "The pressure angle of an involute gear, in degrees."
+      clearance:
+        type: float
+        default: 0.25
+        desc: "The root clearance, as a multiple of the module."
+      backlash:
+        type: float
+        default: 0.0
+        desc: "The backlash of an involute gear, in mm."
+      thickness:
+        type: float
+        default: 5.0
+        desc: "The face width: how far the profile is extruded along Z, in mm."
+      bore:
+        type: float
+        default: 0.0
+        desc: "The diameter of a hole through the centre, in mm; 0 for none."
+      segments_per_flank:
+        type: int
+        default: 8
+        desc: "How many straight segments approximate each tooth flank."
+
+  helical_gear:
+    type: ":gear"
+    desc: "An involute helical gear: a spur gear's profile twisted along its face width."
+    parameters:
+      module:
+        type: float
+        default: 1.0
+        desc: "The module in mm: the pitch diameter divided by the number of teeth."
+      teeth:
+        type: int
+        default: 20
+        desc: "The number of teeth (at least 4 for an involute gear, 3 for a cycloidal one)."
+      pressure_angle:
+        type: float
+        default: 20.0
+        desc: "The pressure angle of an involute gear, in degrees."
+      clearance:
+        type: float
+        default: 0.25
+        desc: "The root clearance, as a multiple of the module."
+      backlash:
+        type: float
+        default: 0.0
+        desc: "The backlash of an involute gear, in mm."
+      thickness:
+        type: float
+        default: 5.0
+        desc: "The face width: how far the profile is extruded along Z, in mm."
+      helix_angle:
+        type: float
+        default: 20.0
+        desc: "The helix angle of an involute gear, in degrees; 0 is a spur gear."
+      slices:
+        type: int
+        default: 16
+        desc: "How many slices a helical gear's twist is built from."
+      bore:
+        type: float
+        default: 0.0
+        desc: "The diameter of a hole through the centre, in mm; 0 for none."
+      segments_per_flank:
+        type: int
+        default: 8
+        desc: "How many straight segments approximate each tooth flank."
+
+  cycloidal_gear:
+    type: ":gear"
+    desc: "A cycloidal gear, as clocks and some speed reducers use."
+    profile: cycloidal
+    parameters:
+      module:
+        type: float
+        default: 1.0
+        desc: "The module in mm: the pitch diameter divided by the number of teeth."
+      teeth:
+        type: int
+        default: 20
+        desc: "The number of teeth (at least 4 for an involute gear, 3 for a cycloidal one)."
+      clearance:
+        type: float
+        default: 0.25
+        desc: "The root clearance, as a multiple of the module."
+      generating_radius:
+        type: float
+        default: 2.0
+        desc: "The radius of the circle a cycloidal tooth is rolled with, as a multiple of the module (csgrs accepts about 1.5 to 3)."
+      thickness:
+        type: float
+        default: 5.0
+        desc: "The face width: how far the profile is extruded along Z, in mm."
+      bore:
+        type: float
+        default: 0.0
+        desc: "The diameter of a hole through the centre, in mm; 0 for none."
+      segments_per_flank:
+        type: int
+        default: 8
+        desc: "How many straight segments approximate each tooth flank."
+
+  rack:
+    type: ":rack"
+    desc: "An involute rack, to mesh with the spur gear of the same module."
+    parameters:
+      module:
+        type: float
+        default: 1.0
+        desc: "The module in mm, matching the gear the rack meshes with."
+      teeth:
+        type: int
+        default: 10
+        desc: "The number of teeth."
+      pressure_angle:
+        type: float
+        default: 20.0
+        desc: "The pressure angle of an involute rack, in degrees."
+      clearance:
+        type: float
+        default: 0.25
+        desc: "The root clearance, as a multiple of the module."
+      backlash:
+        type: float
+        default: 0.0
+        desc: "The backlash of an involute rack, in mm."
+      thickness:
+        type: float
+        default: 5.0
+        desc: "The face width: how far the profile is extruded along Z, in mm."
+
+  gyroid:
+    type: ":tpms"
+    desc: "A block of gyroid lattice: light, stiff in every direction, and printable without supports."
+    surface: gyroid
+    parameters:
+      size_x:
+        type: float
+        default: 20.0
+        desc: "The extent of the block along X, in mm."
+      size_y:
+        type: float
+        default: 20.0
+        desc: "The extent of the block along Y, in mm."
+      size_z:
+        type: float
+        default: 20.0
+        desc: "The extent of the block along Z, in mm."
+      period:
+        type: float
+        default: 10.0
+        desc: "The cell size: the distance the surface repeats over, in mm."
+      thickness:
+        type: float
+        default: 1.0
+        desc: "The wall thickness, in the field's units (about mm for small values)."
+      iso:
+        type: float
+        default: 0.0
+        desc: "The level of the field the wall is centred on; 0 splits space in two equal halves."
+      resolution:
+        type: int
+        default: 24
+        desc: "How many samples the field is taken at along each axis; the mesh grows with its square, and the time with its cube."
+
+  schwarz_p:
+    type: ":tpms"
+    desc: "A block of Schwarz P lattice."
+    surface: schwarz_p
+    parameters:
+      size_x:
+        type: float
+        default: 20.0
+        desc: "The extent of the block along X, in mm."
+      size_y:
+        type: float
+        default: 20.0
+        desc: "The extent of the block along Y, in mm."
+      size_z:
+        type: float
+        default: 20.0
+        desc: "The extent of the block along Z, in mm."
+      period:
+        type: float
+        default: 10.0
+        desc: "The cell size: the distance the surface repeats over, in mm."
+      thickness:
+        type: float
+        default: 1.0
+        desc: "The wall thickness, in the field's units (about mm for small values)."
+      iso:
+        type: float
+        default: 0.0
+        desc: "The level of the field the wall is centred on; 0 splits space in two equal halves."
+      resolution:
+        type: int
+        default: 24
+        desc: "How many samples the field is taken at along each axis; the mesh grows with its square, and the time with its cube."
+
+  schwarz_d:
+    type: ":tpms"
+    desc: "A block of Schwarz D (diamond) lattice."
+    surface: schwarz_d
+    parameters:
+      size_x:
+        type: float
+        default: 20.0
+        desc: "The extent of the block along X, in mm."
+      size_y:
+        type: float
+        default: 20.0
+        desc: "The extent of the block along Y, in mm."
+      size_z:
+        type: float
+        default: 20.0
+        desc: "The extent of the block along Z, in mm."
+      period:
+        type: float
+        default: 10.0
+        desc: "The cell size: the distance the surface repeats over, in mm."
+      thickness:
+        type: float
+        default: 1.0
+        desc: "The wall thickness, in the field's units (about mm for small values)."
+      iso:
+        type: float
+        default: 0.0
+        desc: "The level of the field the wall is centred on; 0 splits space in two equal halves."
+      resolution:
+        type: int
+        default: 24
+        desc: "How many samples the field is taken at along each axis; the mesh grows with its square, and the time with its cube."
+
+  naca_airfoil:
+    type: ":airfoil"
+    desc: "A NACA four-digit wing section, extruded along its span."
+    parameters:
+      naca:
+        type: string
+        default: "2412"
+        desc: "The four-digit NACA designation, such as '0012' or '2412'."
+      chord:
+        type: float
+        default: 100.0
+        desc: "The chord length, in mm."
+      span:
+        type: float
+        default: 200.0
+        desc: "How far the section is extruded along Z, in mm."
+      samples:
+        type: int
+        default: 80
+        desc: "How many points each surface of the section is sampled at (at least 10)."
+
+  text:
+    type: ":text"
+    desc: "Text in a single-stroke Hershey font, extruded: a label, an engraving, a nameplate."
+    parameters:
+      text:
+        type: string
+        default: "PartCAD"
+        desc: "The text. A newline starts a new line."
+      size:
+        type: float
+        default: 10.0
+        desc: "The height of a capital letter, in mm."
+      depth:
+        type: float
+        default: 2.0
+        desc: "How far the letters are extruded along Z, in mm."
+      font:
+        type: string
+        default: "futural"
+        desc: "The built-in single-stroke Hershey font, by name: such as 'futural', 'futuram', 'rowmans', 'rowmand', 'timesr', 'scripts', 'gothiceng' or 'greek'."
+      stroke:
+        type: float
+        default: 0.0
+        desc: "The width of the strokes, in mm; 0 for a tenth of 'size'."
+      halign:
+        type: string
+        enum: [left, center, right]
+        default: "left"
+        desc: "Where X = 0 is: the 'left', 'center' or 'right' of the text."

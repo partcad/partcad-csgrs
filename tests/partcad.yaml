@@ -1,0 +1,82 @@
+# The package these tests build parts from: what a workspace using this plugin
+# looks like, with the plugin imported through a `local` dependency rather than
+# from the public index.
+#
+# The `.pcignore` beside this file is what keeps it out of the plugin's own
+# package tree. Without it this folder would be a subpackage of the plugin --
+# listed wherever the plugin is used -- and a workspace opened in here would
+# climb to the plugin as its root.
+desc: |
+  Parts built with the csgrs plugin: one per part type, from its own keys,
+  its declared parameters, or the files beside this one ('logo.png', a ring
+  and a bar; 'model.wrl', a 2 x 1 x 0.5 box in tenths of an inch;
+  'bracket.csgrs', a plate with a hub and a hole) -- and a board hyperdrc
+  checks ('board.kicad_pcb').
+
+dependencies:
+  csgrs:
+    type: local
+    path: ..
+
+parts:
+  pinion:
+    type: csgrs:gear
+    teeth: 12
+    module: 1.5
+    thickness: 4
+  helical:
+    type: csgrs:gear
+    parameters:
+      helix_angle:
+        type: float
+        default: 15.0
+      bore:
+        type: float
+        default: 5.0
+  bar:
+    type: csgrs:rack
+    profile: involute
+    teeth: 6
+  lattice:
+    type: csgrs:tpms
+    surface: schwarz_p
+    resolution: 12
+  wing:
+    type: csgrs:airfoil
+    naca: "0012"
+    chord: 50
+    span: 20
+  label:
+    type: csgrs:text
+    text: PC
+    size: 8
+  logo:
+    type: csgrs:image
+    pixel_size: 0.5
+    depth: 2
+  model:
+    type: csgrs:vrml
+    units: 2.54
+  bracket:
+    type: csgrs:csg
+    parameters:
+      width:
+        type: float
+        default: 40.0
+      hole:
+        type: float
+        default: 6.0
+  board:
+    type: kicad
+    desc: >-
+      A two-pad board ('board.kicad_pcb') with a via of one net drilled into
+      a pad of another: what hyperdrc's test is there to catch.
+    manufacturable: false
+    # A 'kicad' part is a board in progress until it says otherwise, and
+    # 'pc qual test' leaves one in progress alone.
+    finalized: true
+    qual:
+      other:
+        drc:
+          path: csgrs:hyperdrc
+          desc: The board's design readiness, as hyperdrc checks it

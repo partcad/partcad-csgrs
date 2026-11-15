@@ -1,0 +1,8 @@
+[flake8]
+max-line-length = 120
+# black puts a space before the colon of a slice whose bounds are expressions.
+extend-ignore = E203
+# The partType and qual wrappers inject 'request' into the scripts they run.
+per-file-ignores =
+    csgrs_part.py: F821
+extend-exclude = cli/target,.cache

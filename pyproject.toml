@@ -1,0 +1,9 @@
+# Not a Python distribution: a PartCAD package, whose scripts PartCAD runs in
+# its sandbox. This only says how the scripts are formatted and linted, the
+# way PartCAD's own are.
+[tool.black]
+line-length = 120
+
+[tool.isort]
+profile = "black"
+line_length = 120

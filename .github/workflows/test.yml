@@ -1,0 +1,120 @@
+# This package's tests: the program on its own, the scripts on their own, and
+# the package used the way a workspace uses it, through PartCAD.
+#
+# Three jobs, because they answer three questions. The first builds and tests
+# `csgrs-partcad` -- and builds `hyperdrc` at the same csgrs commit -- and says
+# whether the program is right. The second needs nothing but pytest and says
+# whether the scripts are. The third installs PartCAD, puts the two programs
+# the first built on the PATH, and builds real parts: whether this package
+# still works with the PartCAD it is used with.
+name: Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      partcad:
+        description: "The PartCAD to test against, as a pip requirement"
+        default: "partcad @ git+https://github.com/partcad/partcad.git@devel"
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  schedule:
+    # PartCAD moves, and so does the base its sandbox is built on; this package
+    # does not. Running nightly against PartCAD's development branch finds a
+    # change there that breaks this plugin before a release ships it.
+    - cron: "40 5 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The interpreter PartCAD runs a package's scripts on by default.
+  PYTHON_VERSION: "3.11"
+  PARTCAD: ${{ inputs.partcad || 'partcad @ git+https://github.com/partcad/partcad.git@devel' }}
+  CARGO_TERM_COLOR: never
+
+jobs:
+  program:
+    name: "The program (cargo)"
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: cli
+      - name: Format
+        run: cargo fmt --manifest-path cli/Cargo.toml --check
+      - name: Lint
+        run: cargo clippy --manifest-path cli/Cargo.toml --release --locked --all-targets -- -D warnings
+      - name: Test
+        run: cargo test --manifest-path cli/Cargo.toml --release --locked
+      - name: Build csgrs-partcad
+        run: cargo build --manifest-path cli/Cargo.toml --release --locked
+      # hyperdrc at the commit the crate pins csgrs at: one csgrs for both
+      # programs. Built into the cached target directory, so a run that
+      # changes neither is a cache hit rather than six minutes of rustc.
+      - name: Build hyperdrc
+        run: |
+          set -eu
+          REV="$(grep -m1 -o 'rev = "[0-9a-f]\{40\}"' cli/Cargo.toml | cut -d'"' -f2)"
+          cargo install hyperdrc --locked --git https://github.com/timschmidt/csgrs --rev "${REV}" \
+            --target-dir cli/target/hyperdrc --root "${RUNNER_TEMP}/hyperdrc"
+          mkdir -p bin
+          cp cli/target/release/csgrs-partcad "${RUNNER_TEMP}/hyperdrc/bin/hyperdrc" bin/
+          bin/csgrs-partcad --version
+          bin/hyperdrc --version
+      - uses: actions/upload-artifact@v4
+        with:
+          name: programs
+          path: bin/
+          retention-days: 3
+
+  scripts:
+    name: "The scripts, without PartCAD"
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: python -m pip install pytest pyyaml numpy black isort flake8
+      - name: Lint
+        run: |
+          black --check --diff .
+          isort --check --diff .
+          flake8 .
+      # Without the programs or PartCAD, the tests that need them skip themselves.
+      - run: python -m pytest -m "not slow" -rs
+
+  partcad:
+    name: "The package, through PartCAD"
+    needs: program
+    runs-on: ubuntu-24.04
+    env:
+      # The sandbox that runs on this machine, so that the scripts find the
+      # programs the first job built on the PATH rather than looking for the
+      # pinned release in a container. The image is tested by its own workflow.
+      PC_PYTHON_SANDBOX: venv
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: programs
+          path: bin
+      - name: Put the programs on the PATH
+        run: |
+          chmod +x bin/*
+          echo "${GITHUB_WORKSPACE}/bin" >> "${GITHUB_PATH}"
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: python -m pip install pytest pyyaml "${PARTCAD}"
+      - run: python -m pytest -rs

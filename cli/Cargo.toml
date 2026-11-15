@@ -1,0 +1,37 @@
+[package]
+name = "csgrs-partcad"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+description = "The command line tool PartCAD's csgrs plugin runs: a JSON request in, a triangle mesh out"
+license = "Apache-2.0"
+repository = "https://github.com/partcad/partcad-csgrs"
+publish = false
+
+# csgrs and its sibling crates come from one commit of one repository, so that
+# Cargo resolves them to one copy and the geometry a release builds is the
+# geometry its tests saw. Moving the pin is a release of this package: change
+# `rev` in all three, run `cargo update -p csgrs`, and raise CACHE_VERSION in
+# `csgrs_part.py` (see README.md, "Updating csgrs").
+[dependencies]
+csgrs = { git = "https://github.com/timschmidt/csgrs", rev = "1671894b4a896b091416503910e3720ecf233c82", default-features = false, features = [
+  "curve",
+  "sdf",
+  "offset",
+  "truetype-text",
+  "hershey-text",
+  "image-io",
+  "vrml-io",
+] }
+hypercurve = { git = "https://github.com/timschmidt/csgrs", rev = "1671894b4a896b091416503910e3720ecf233c82" }
+hyperlattice = { git = "https://github.com/timschmidt/csgrs", rev = "1671894b4a896b091416503910e3720ecf233c82" }
+# Decoders for the raster formats the `image` part type reads. csgrs requests
+# none itself (its `image-io` feature takes an already-decoded image).
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "bmp", "gif"] }
+serde_json = "1"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true

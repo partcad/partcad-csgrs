@@ -1,0 +1,9 @@
+# A plate with a hole through it and a hub on top: a 'csg' part's tree.
+# '${...}' is worked out over the part's parameters ('width', 'hole').
+difference:
+  - union:
+      - cuboid: ["${width}", 20, 5]
+      - cylinder: {r: 6, h: 5}
+        translate: ["${width / 2}", 10, 5]
+  - cylinder: {r: "${hole / 2}", h: 20, segments: 48}
+    translate: ["${width / 2}", 10, -5]

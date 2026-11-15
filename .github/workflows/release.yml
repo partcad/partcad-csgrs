@@ -1,0 +1,117 @@
+# A release of this package's programs: `csgrs-partcad` and `hyperdrc`, built
+# for every platform PartCAD runs on, in one archive each, with the checksums
+# `csgrs_tool.py` verifies a download against.
+#
+# Started by pushing a tag `v<version>`, which has to be the version
+# `cli/Cargo.toml` and `csgrs_tool.py` say (see README.md, "Releasing").
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: never
+
+jobs:
+  build:
+    name: "Build (${{ matrix.target }})"
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # glibc as old as the oldest runner offers, so that the build runs on
+          # the Debian of PartCAD's sandbox image and on most distributions.
+          - { os: ubuntu-22.04, target: x86_64-unknown-linux-gnu, archive: tar.gz }
+          - { os: ubuntu-22.04-arm, target: aarch64-unknown-linux-gnu, archive: tar.gz }
+          - { os: macos-15, target: aarch64-apple-darwin, archive: tar.gz }
+          - { os: macos-15, target: x86_64-apple-darwin, archive: tar.gz }
+          - { os: windows-2025, target: x86_64-pc-windows-msvc, archive: zip }
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: The tag is the version the package says
+        shell: bash
+        run: |
+          set -eu
+          TAG="${GITHUB_REF_NAME#v}"
+          CRATE="$(grep -m1 '^version = ' cli/Cargo.toml | cut -d'"' -f2)"
+          TOOL="$(grep -m1 '^VERSION = ' csgrs_tool.py | cut -d'"' -f2)"
+          if [ "${TAG}" != "${CRATE}" ] || [ "${TAG}" != "${TOOL}" ]; then
+            echo "The tag says ${TAG}, cli/Cargo.toml ${CRATE} and csgrs_tool.py ${TOOL}; they have to agree." >&2
+            exit 1
+          fi
+          echo "VERSION=${TAG}" >> "${GITHUB_ENV}"
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build
+        shell: bash
+        run: |
+          set -eu
+          REV="$(grep -m1 -o 'rev = "[0-9a-f]\{40\}"' cli/Cargo.toml | cut -d'"' -f2)"
+          cargo build --manifest-path cli/Cargo.toml --release --locked --target "${{ matrix.target }}"
+          cargo install hyperdrc --locked --git https://github.com/timschmidt/csgrs --rev "${REV}" \
+            --target "${{ matrix.target }}" --root "${RUNNER_TEMP}/hyperdrc"
+
+      - name: Package
+        shell: bash
+        run: |
+          set -eu
+          EXE=""
+          if [ "${{ matrix.archive }}" = "zip" ]; then EXE=".exe"; fi
+          NAME="csgrs-partcad-${VERSION}-${{ matrix.target }}"
+          mkdir -p "dist/${NAME}"
+          cp "cli/target/${{ matrix.target }}/release/csgrs-partcad${EXE}" "${RUNNER_TEMP}/hyperdrc/bin/hyperdrc${EXE}" "dist/${NAME}/"
+          cp LICENSE.txt "dist/${NAME}/LICENSE.txt"
+          REV="$(grep -m1 -o 'rev = "[0-9a-f]\{40\}"' cli/Cargo.toml | cut -d'"' -f2)"
+          curl -fsSL "https://raw.githubusercontent.com/timschmidt/csgrs/${REV}/LICENSE" -o "dist/${NAME}/LICENSE-csgrs.txt"
+          {
+            echo "csgrs-partcad ${VERSION}, built from https://github.com/partcad/partcad-csgrs at ${GITHUB_SHA}"
+            echo "csgrs and hyperdrc at https://github.com/timschmidt/csgrs/tree/${REV}"
+          } > "dist/${NAME}/BUILD.txt"
+          cd dist
+          if [ "${{ matrix.archive }}" = "zip" ]; then
+            7z a -tzip "${NAME}.zip" "${NAME}" >/dev/null
+          else
+            tar -czf "${NAME}.tar.gz" "${NAME}"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: dist/*.${{ matrix.archive }}
+
+  publish:
+    name: "Publish the release"
+    needs: build
+    # Whatever built: a platform whose build failed is one ASSETS leaves out
+    # until the next release, not a reason to withhold every other one.
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        run: |
+          cd dist
+          sha256sum -- * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+      - name: Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" dist/* \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "${GITHUB_REF_NAME}" \
+            --notes "csgrs-partcad and hyperdrc, built from csgrs at the commit cli/Cargo.toml pins. Put each archive's SHA-256 (SHA256SUMS.txt) into ASSETS in csgrs_tool.py."
