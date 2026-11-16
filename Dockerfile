@@ -29,6 +29,14 @@ LABEL org.opencontainers.image.source="https://github.com/partcad/partcad-csgrs"
 
 USER root
 
+# What the scripts import where PartCAD runs them in this image as it is
+# (`container:`, the `*_in_container` types) rather than in a sandbox it builds
+# from it: OpenCASCADE, through the build123d PartCAD pins (its
+# 'sandbox_versions'), and PyYAML for a CSG tree. Into the image's own Python,
+# which is the one the allowlist below names; a sandbox built from this image
+# is a virtual environment of its own, and does not see them.
+RUN python3 -m pip install --no-cache-dir build123d==0.11.1 pyyaml==6.0.3
+
 # The pinned release, verified against its checksum, into /usr/local/bin,
 # which a sandbox that rebuilds PATH still searches.
 COPY csgrs_tool.py /tmp/csgrs_tool.py

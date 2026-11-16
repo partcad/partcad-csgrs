@@ -56,10 +56,41 @@ def tool():
     return _module("csgrs_tool")
 
 
-def _yaml(path):
+# The PartCAD the package is read as by default: the first with everything it
+# declares (sketchTypes, and container: for them).
+NEWEST = "0.10.25"
+
+
+def _yaml(path, partcad=NEWEST):
+    """A YAML file, rendered first if it is a 'partcad.yaml' -- a Jinja2 template -- as 'partcad' renders it.
+
+    'partcad' is the version of PartCAD doing the reading, or None for one that
+    predates the names a template asks the version by.
+    """
     yaml = pytest.importorskip("yaml")
     with open(path, encoding="utf-8") as f:
-        return yaml.safe_load(f)
+        text = f.read()
+    if os.path.basename(path) == "partcad.yaml":
+        jinja2 = pytest.importorskip("jinja2")
+        names = {}
+        if partcad is not None:
+            have = _version(partcad)
+            names = {
+                "partcad_version_major": have[0],
+                "partcad_version_at_least": lambda wanted: have >= _version(wanted),
+            }
+        text = jinja2.Template(text).render(**names)
+    return yaml.safe_load(text)
+
+
+IN_CONTAINER = "_in_container"
+
+
+def _run_anywhere(declared):
+    """The types of a section that are not run in the image, and those that are, by the type they run."""
+    plain = {name: spec for name, spec in declared.items() if not name.endswith(IN_CONTAINER)}
+    contained = {name[: -len(IN_CONTAINER)]: spec for name, spec in declared.items() if name.endswith(IN_CONTAINER)}
+    return plain, contained
 
 
 # --------------------------------------------------------------------------- #
@@ -209,9 +240,58 @@ def test_the_image_pinned_is_the_one_its_inputs_make():
     if not shutil.which("sh") or not (shutil.which("sha256sum") or shutil.which("shasum")):
         pytest.skip("no sh and sha256sum here to compute the tag with")
     tag = subprocess.run(["sh", os.path.join(PLUGIN, "image-tag.sh")], capture_output=True, text=True, check=True)
-    assert _yaml(os.path.join(PLUGIN, "partcad.yaml"))["dockerImage"] == (
-        "ghcr.io/partcad/partcad-csgrs:" + tag.stdout.strip()
-    )
+    package = _yaml(os.path.join(PLUGIN, "partcad.yaml"))
+    image = "ghcr.io/partcad/partcad-csgrs:" + tag.stdout.strip()
+    assert package["dockerImage"] == image
+    # ...and the types run in it as it is name the very same image.
+    for section in ("partTypes", "sketchTypes"):
+        for name, spec in _run_anywhere(package[section])[1].items():
+            assert spec["container"] == {"image": image, "name": "csgrs"}, (section, name)
+
+
+@pytest.mark.parametrize("section, script", [("partTypes", "csgrs_part.py"), ("sketchTypes", "csgrs_sketch.py")])
+def test_every_type_can_also_run_in_the_image(section, script):
+    """'<type>_in_container' is '<type>', with its file and its solidity, run in the image instead."""
+    plain, contained = _run_anywhere(_yaml(os.path.join(PLUGIN, "partcad.yaml"))[section])
+    assert sorted(contained) == sorted(plain)
+    for name, spec in contained.items():
+        assert spec["path"] == script
+        assert spec.get("extension") == plain[name].get("extension"), name
+        assert spec.get("requireSolid") == plain[name].get("requireSolid"), name
+        # The image carries what a sandbox would install: no requirements of its own.
+        assert "pythonRequirements" not in spec and "dockerImage" not in spec, name
+
+
+@pytest.mark.parametrize(
+    "partcad, sees",
+    [
+        (None, set()),
+        ("0.10.0", set()),
+        ("0.10.23", set()),
+        ("0.10.24", {"part types in the image"}),
+        ("0.10.25", {"part types in the image", "sketch types", "sketches"}),
+        ("0.11.0", {"part types in the image", "sketch types", "sketches"}),
+    ],
+)
+def test_a_partcad_sees_only_what_it_can_build(partcad, sees):
+    """An older PartCAD is not shown what needs a newer one: it lists nothing it would fail to build."""
+    package = _yaml(os.path.join(PLUGIN, "partcad.yaml"), partcad)
+    seen = set()
+    if any(name.endswith(IN_CONTAINER) for name in package["partTypes"]):
+        seen.add("part types in the image")
+    if "sketchTypes" in package:
+        seen.add("sketch types")
+    if "sketches" in package:
+        seen.add("sketches")
+    assert seen == sees
+    # What every PartCAD from the package's floor up sees, whichever it is.
+    assert {"gear", "tpms", "csg"} <= set(package["partTypes"]) and "hyperdrc" in package["qual"]
+    assert "spur_gear" in package["parts"]
+
+
+def test_a_type_run_in_the_image_is_the_type_it_is_named_after(part):
+    assert part.type_name({"config": {"type": "//pub/feature/cad/csgrs:gear_in_container"}}) == "gear"
+    assert part.type_name({"config": {"type": "csgrs:csg_profile_in_container"}}) == "csg_profile"
 
 
 def test_the_image_installs_what_a_download_would():
@@ -321,7 +401,7 @@ def described():
 
 
 def test_the_package_declares_every_type_the_program_builds(described):
-    declared = _yaml(os.path.join(PLUGIN, "partcad.yaml"))["partTypes"]
+    declared, _contained = _run_anywhere(_yaml(os.path.join(PLUGIN, "partcad.yaml"))["partTypes"])
     assert sorted(declared) == sorted(described["types"])
     for name, spec in described["types"].items():
         assert declared[name]["path"] == "csgrs_part.py"
@@ -600,7 +680,7 @@ def sketch():
 
 
 def test_the_package_declares_every_sketch_type_the_program_builds(described):
-    declared = _yaml(os.path.join(PLUGIN, "partcad.yaml"))["sketchTypes"]
+    declared, _contained = _run_anywhere(_yaml(os.path.join(PLUGIN, "partcad.yaml"))["sketchTypes"])
     assert sorted(declared) == sorted(described["sketch_types"])
     for name, spec in described["sketch_types"].items():
         assert declared[name]["path"] == "csgrs_sketch.py"

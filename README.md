@@ -19,6 +19,7 @@ board design-readiness checker built on it.
 | The same profiles as sketches | `type: csgrs:gear_profile`, `rack_profile`, `airfoil_profile`, `text_profile`, `truetype_profile`, `image_profile`, `csg_profile` | as the part type |
 | Ready-made parametric sketches | `csgrs:gear_outline`, `naca_section`, `text_outline` | — |
 | hyperdrc's PCB design-readiness checks | `qual: other: <name>: {path: csgrs:hyperdrc}` | a `.kicad_pcb`, or Gerbers |
+| Any of the types above, run in this package's image | `type: csgrs:<type>_in_container`, such as `csgrs:gear_in_container` | as the type |
 
 `csgrs:` is the name the workspace imports this package under; use whatever name the dependency is given.
 It needs PartCAD 0.10.0 or newer, the first that reads a plugin package's `qual:` section; the sketch types need a
@@ -200,6 +201,30 @@ the polygonal prism its `segments` say. Where a true curved surface matters down
 B-rep kernel (CadQuery, build123d); where it does not — a gear for printing, a lattice, a label — csgrs is
 exact about the geometry it does make.
 
+## Running in the image
+
+Every part and sketch type has a twin that runs in this package's image instead: `gear_in_container`,
+`tpms_in_container`, `csg_profile_in_container` and so on, each with the parameters and the file of the type it is
+named after. They use PartCAD's `container:` (0.10.24 for part types, 0.10.25 for sketch types), which runs the
+script in the image as it is: nothing is installed on the machine and no Python environment is built, because the
+image already carries both programs, OpenCASCADE, numpy and PyYAML.
+
+```yaml
+parts:
+  pinion:
+    type: csgrs:gear_in_container
+    teeth: 12
+```
+
+The plain types prefer the same image too -- it is the package's `dockerImage` -- but only where PartCAD's `docker`
+sandbox is in use, and they fall back to a sandbox of their own and a download of the programs anywhere else. The
+`_in_container` types do not fall back: they need a container runtime (Docker), and fail without one, saying so.
+Choose them where that is what you want: every part built in one known environment, whatever the machine.
+
+A PartCAD older than 0.10.24 is not shown them, and one older than 0.10.25 is not shown the sketch types at all:
+`partcad.yaml` is a template, and asks which PartCAD is reading it (`partcad_version_at_least`), so an older one
+lists nothing it would fail to build.
+
 ## Where the programs come from
 
 Both programs are native: `csgrs-partcad` is built from [`cli/`](cli) and `hyperdrc` from csgrs's own
@@ -223,12 +248,15 @@ cargo install hyperdrc --locked --git https://github.com/timschmidt/csgrs --rev 
 ## The image
 
 [`Dockerfile`](Dockerfile) builds `ghcr.io/partcad/partcad-csgrs` `FROM` PartCAD's Python sandbox image, adding
-the two programs -- installed by `csgrs_tool.py` itself, so the image and a download are the same build -- and
+the two programs -- installed by `csgrs_tool.py` itself, so the image and a download are the same build -- and,
+for the `_in_container` types, OpenCASCADE (build123d 0.11.1, PartCAD's pin), numpy and PyYAML in the image's own
+Python; and
 [`verify_image.py`](verify_image.py) refuses, at build time, an image whose programs cannot build a hollow cube.
 [`.github/workflows/image.yml`](.github/workflows/image.yml) builds it for `amd64` and `arm64` on every pull
 request and publishes it from `main`, tagged with a hash of what it is built from ([`image-tag.sh`](image-tag.sh)):
 `csgrs_tool.py` is one of those inputs, so a new release is a new tag. `partcad.yaml` pins that tag as the
-package's `dockerImage`, which PartCAD's `docker` sandbox uses where it can pull it.
+package's `dockerImage`, which PartCAD's `docker` sandbox uses where it can pull it, and as the `container:` of every
+`_in_container` type, through one YAML anchor.
 
 After changing the `Dockerfile`, `verify_image.py` or `csgrs_tool.py`, run `./image-tag.sh` and put what it prints
 into `partcad.yaml` in the same commit; the workflow refuses a pin that does not match.

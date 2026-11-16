@@ -210,10 +210,16 @@ def read_tree(path):
 # --------------------------------------------------------------------------- #
 
 
+# What the types run in this package's image are called beside the ones they
+# run: 'gear_in_container' is 'gear' (see partcad.yaml).
+IN_CONTAINER = "_in_container"
+
+
 def type_name(request):
-    """The part type this part is: the name after the last ':' of its 'type:'."""
+    """The part type this part is: the name after the last ':' of its 'type:', as run anywhere."""
     declared = str((request.get("config") or {}).get("type") or "")
-    return declared.rsplit(":", 1)[-1]
+    name = declared.rsplit(":", 1)[-1]
+    return name[: -len(IN_CONTAINER)] if name.endswith(IN_CONTAINER) else name
 
 
 def parameters(name, spec, request):

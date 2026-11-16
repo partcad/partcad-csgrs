@@ -85,7 +85,9 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - run: python -m pip install pytest pyyaml numpy black isort flake8
+      # jinja2: partcad.yaml is a template, and the tests render it as PartCAD
+      # does, at each version whose view of the package they check.
+      - run: python -m pip install pytest pyyaml jinja2 numpy black isort flake8
       - name: Lint
         run: |
           black --check --diff .

@@ -32,7 +32,7 @@ url: https://github.com/partcad/partcad-csgrs
 # image and the code expecting it cannot drift apart silently. PartCAD appends
 # the machine's architecture before pulling, so one line here covers both. See
 # `.github/workflows/image.yml` and `image-tag.sh`.
-dockerImage: ghcr.io/partcad/partcad-csgrs:66f7bac47e3c
+dockerImage: ghcr.io/partcad/partcad-csgrs:9080fa1d64b8
 
 # Every part type is the one script, which tells them apart by the name after
 # the last ':' of the part's `type:`. Each builds a closed solid, and says so
@@ -108,11 +108,78 @@ partTypes:
     pythonRequirements:
       - pyyaml
 
+# The same part types, run in this package's image as it is -- through
+# PartCAD's `container:` (0.10.24) rather than in a Python sandbox built from
+# it, which is what `dockerImage` above asks for. Nothing is installed on the
+# machine and no Python environment is built: the image already carries the
+# programs, OpenCASCADE and everything the scripts import (see `Dockerfile`).
+# What it costs is a container runtime, which these need where the others do
+# not, and which they fail without rather than fall back.
+#
+# Each takes the parameters and the file of the type it is named after.
+{% if partcad_version_major is defined and partcad_version_at_least("0.10.24") %}
+  gear_in_container:
+    desc: "'gear', run in this package's image rather than in a Python sandbox."
+    path: csgrs_part.py
+    requireSolid: true
+    container: &in-csgrs-image
+      image: ghcr.io/partcad/partcad-csgrs:9080fa1d64b8
+      name: csgrs
+  rack_in_container:
+    desc: "'rack', run in this package's image rather than in a Python sandbox."
+    path: csgrs_part.py
+    requireSolid: true
+    container: *in-csgrs-image
+  tpms_in_container:
+    desc: "'tpms', run in this package's image rather than in a Python sandbox."
+    path: csgrs_part.py
+    requireSolid: true
+    container: *in-csgrs-image
+  airfoil_in_container:
+    desc: "'airfoil', run in this package's image rather than in a Python sandbox."
+    path: csgrs_part.py
+    requireSolid: true
+    container: *in-csgrs-image
+  text_in_container:
+    desc: "'text', run in this package's image rather than in a Python sandbox."
+    path: csgrs_part.py
+    requireSolid: true
+    container: *in-csgrs-image
+  truetype_in_container:
+    desc: "'truetype', run in this package's image rather than in a Python sandbox."
+    path: csgrs_part.py
+    extension: ttf
+    requireSolid: true
+    container: *in-csgrs-image
+  image_in_container:
+    desc: "'image', run in this package's image rather than in a Python sandbox."
+    path: csgrs_part.py
+    extension: png
+    requireSolid: true
+    container: *in-csgrs-image
+  vrml_in_container:
+    desc: "'vrml', run in this package's image rather than in a Python sandbox."
+    path: csgrs_part.py
+    extension: wrl
+    container: *in-csgrs-image
+  csg_in_container:
+    desc: "'csg', run in this package's image rather than in a Python sandbox."
+    path: csgrs_part.py
+    extension: csgrs
+    requireSolid: true
+    container: *in-csgrs-image
+{% endif %}
+
 # The profiles the part types extrude, as sketches: the region csgrs builds in
 # the XY plane, its boundary the curves csgrs kept -- lines, circular arcs,
 # Bezier curves -- rather than a polygon standing in for them. One script for
 # all of them, as for the part types. Each takes its part type's parameters
 # less those only a solid has (thickness, depth, span).
+#
+# Declared only to a PartCAD that has `sketchTypes:` (0.10.25): an older one
+# would list sketches of types it cannot build. It sees the part types and the
+# test, and none of this.
+{% if partcad_version_major is defined and partcad_version_at_least("0.10.25") %}
 sketchTypes:
   gear_profile:
     desc: |
@@ -156,6 +223,39 @@ sketchTypes:
     extension: csgrs
     pythonRequirements:
       - pyyaml
+  # The sketch types, run in this package's image (see the part types').
+  gear_profile_in_container:
+    desc: "'gear_profile', run in this package's image rather than in a Python sandbox."
+    path: csgrs_sketch.py
+    container: *in-csgrs-image
+  rack_profile_in_container:
+    desc: "'rack_profile', run in this package's image rather than in a Python sandbox."
+    path: csgrs_sketch.py
+    container: *in-csgrs-image
+  airfoil_profile_in_container:
+    desc: "'airfoil_profile', run in this package's image rather than in a Python sandbox."
+    path: csgrs_sketch.py
+    container: *in-csgrs-image
+  text_profile_in_container:
+    desc: "'text_profile', run in this package's image rather than in a Python sandbox."
+    path: csgrs_sketch.py
+    container: *in-csgrs-image
+  truetype_profile_in_container:
+    desc: "'truetype_profile', run in this package's image rather than in a Python sandbox."
+    path: csgrs_sketch.py
+    extension: ttf
+    container: *in-csgrs-image
+  image_profile_in_container:
+    desc: "'image_profile', run in this package's image rather than in a Python sandbox."
+    path: csgrs_sketch.py
+    extension: png
+    container: *in-csgrs-image
+  csg_profile_in_container:
+    desc: "'csg_profile', run in this package's image rather than in a Python sandbox."
+    path: csgrs_sketch.py
+    extension: csgrs
+    container: *in-csgrs-image
+{% endif %}
 
 # hyperdrc's design-readiness checks of a printed circuit board, as a test an
 # object declares under `qual: other:` and `pc qual test --other` runs:
@@ -499,6 +599,7 @@ parts:
         enum: [left, center, right]
         default: "left"
         desc: "Where X = 0 is: the 'left', 'center' or 'right' of the text."
+{% if partcad_version_major is defined and partcad_version_at_least("0.10.25") %}
 # Ready-made sketches, like the ready-made parts: `csgrs:gear_outline;teeth=30`.
 sketches:
   gear_outline:
@@ -574,4 +675,4 @@ sketches:
         enum: [left, center, right]
         default: "left"
         desc: "Where X = 0 is: the 'left', 'center' or 'right' of the text."
-
+{% endif %}

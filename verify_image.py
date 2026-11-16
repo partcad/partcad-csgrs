@@ -10,7 +10,9 @@ Run at build time, so that an image which cannot is never published. The base
 image's own `verify.py` checks the contract PartCAD talks to a container
 through; this checks what this image adds on top of it, the way the package
 uses it: `csgrs-partcad` builds a hollow cube and reports it as the solid and
-the cavity it is, and `hyperdrc` answers as the release the package pins.
+the cavity it is, `hyperdrc` answers as the release the package pins, and the
+image's own Python imports OpenCASCADE, numpy and PyYAML, which a script run in
+the image as it is (`container:`) needs.
 """
 
 import json
@@ -53,6 +55,19 @@ def main() -> int:
                     failures.append(
                         "csgrs-partcad built %s of %r mm^3, not a solid and a cavity of 936" % (kinds, volume)
                     )
+
+    # What a script imports when PartCAD runs it in this image as it is.
+    imported = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import OCP, numpy, yaml; from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeShapeOnMesh",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if imported.returncode != 0:
+        failures.append("the image's Python cannot import what the scripts need: %s" % imported.stderr.strip()[-300:])
 
     drc = shutil.which("hyperdrc")
     if drc:
