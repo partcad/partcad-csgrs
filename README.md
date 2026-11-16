@@ -26,6 +26,10 @@ It needs PartCAD 0.10.0 or newer, the first that reads a plugin package's `qual:
 PartCAD with `sketchTypes:` -- 0.10.25 or newer ([partcad/partcad#963](https://github.com/partcad/partcad/pull/963))
 -- and an older one builds everything else and says it does not know a sketch's type.
 
+Every one of these has a worked example in
+[partcad/partcad-examples-csgrs](https://github.com/partcad/partcad-examples-csgrs) (`//pub/examples/script/csgrs`
+in the PartCAD index), with a picture of each.
+
 ## Using it
 
 ```yaml
